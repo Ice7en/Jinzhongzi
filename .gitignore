@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+
+# 训练产物
+log/
+runs/
+*.pt
+*.pth
+*.onnx
+*.tflite
+
+# 数据（体积大，不入库）
+dataset/**/*.npz
+dataset/**/*.txt
+data/
+*.npy
+*.npz
+
+# 提交产物
+*.zip
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# WSL / 本地临时
+*.sh.swp
