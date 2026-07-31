@@ -238,6 +238,8 @@ TEMPORAL_MEMORY:
   temporal_memory_base_lr_multiplier: 1.0    # 本仓库改为 1.0（关键）
   temporal_memory_memory_lr_multiplier: 1.0
 ```
+注意：YAML 配置文件的默认 seed: 37（e.g. evisseg_evuav.yaml:20），seed=42 是靠命令行 --set TRAIN.seed=42
+  覆盖的。如果以后裸跑不带这个 override，会掉回 37，跨实验不可复现。
 
 ## 与官方 EVC 的代码改动
 
