@@ -1,0 +1,247 @@
+STRUCTURE:
+  model_name: evissgnet
+  width: 12
+  block_residual: True
+  block_reps: 2
+  use_coords: True
+  # P2b: disabled by default; enable with --set STRUCTURE.p2b_density_gdsca_enabled=true
+  p2b_density_gdsca_enabled: false
+  # P16: enable true global token attention after sparse patch pooling.
+  p16_global_patch_attention_enabled: false
+
+DATA:
+  input_channel: 4
+  root: /mnt/d/AI/ESOD/EV-UAV-main/dataset/EV-UAV-dataset
+  whole_t: 8000
+  res: [346,260]
+
+TRAIN:
+  seed: 37
+  epochs: 50
+  batch_size: 1
+  train_workers: 8
+  optim: Adam
+  lr: 0.001
+  # Default preserves the original StepLR(10, 0.1) behavior.
+  scheduler: step
+  scheduler_step_size: 10
+  scheduler_gamma: 0.1
+  scheduler_min_lr: 0.000001
+  # Optional cosine horizon. Null keeps T_max equal to TRAIN.epochs.
+  scheduler_t_max: null
+  validation_start_epoch: 40
+  # Save every N epochs when nonzero; useful when external validation differs.
+  checkpoint_interval: 0
+  k: 3
+  t: 5
+  max_events_num: 700000
+  model_save_root: /mnt/d/AI/ESOD/EV-UAV-main/log/baseline_scratch_seed37
+  # Optional model-only initialization for a later fine-tuning stage.
+  init_model_path: ""
+  # P2b uses a faster learning rate only for its newly introduced density gates.
+  p2b_gate_lr_multiplier: 1.0
+  # P11 uses a faster learning rate for its zero-initialized activity branch.
+  p11_feature_lr_multiplier: 1.0
+  # P12 uses a faster learning rate for its zero-initialized density branch.
+  p12_feature_lr_multiplier: 1.0
+
+SAMPLING:
+  # P1b: disabled by default; enable with --set SAMPLING.target_preserving_enabled=true
+  target_preserving_enabled: false
+  # P9: add a uniform complement for each oversized P1b training video.
+  density_dual_view_enabled: false
+  density_dual_view_event_count_cutoff: 100000
+  # P10: repeat only oversized target-preserving videos during training.
+  dense_target_oversampling_enabled: false
+  dense_target_oversampling_event_count_cutoff: 100000
+  dense_target_oversampling_factor: 2
+  # P20: train a separate model only on uniform views of oversized videos.
+  dense_specialist_enabled: false
+  dense_specialist_event_count_cutoff: 100000
+  dense_specialist_views_per_video: 6
+  # P21: retain dense-video target events in every specialist training view.
+  dense_specialist_target_preserving_enabled: false
+  # P5: train oversized videos as contiguous temporal chunks instead of random subsamples.
+  temporal_chunk_enabled: false
+  # P15: training-only label-preserving horizontal flip augmentation.
+  p15_horizontal_flip_augmentation_enabled: false
+  p15_horizontal_flip_augmentation_probability: 0.5
+
+LOSS:
+  # P1: disabled by default; enable with --set LOSS.p1_hard_negative_enabled=true
+  p1_hard_negative_enabled: false
+  p1_hard_negative_weight: 0.02
+  p1_hard_negative_ratio: 0.01
+  p1_hard_negative_warmup_epochs: 10
+  # P2a: disabled by default; enable with --set LOSS.p2_positive_stc_floor_enabled=true
+  p2_positive_stc_floor_enabled: false
+  p2_positive_stc_floor: 0.35
+  # P4: target-frame detection loss aligned with the official Pd rule.
+  p4_target_frame_enabled: false
+  p4_target_frame_weight: 0.05
+  p4_target_frame_warmup_epochs: 10
+  # P13: lift target-frame recall while constraining false-alarm components.
+  p13_component_hard_negative_enabled: false
+  p13_component_hard_negative_weight: 0.005
+  p13_target_frame_weight: 0.01
+  p13_component_hard_negative_ratio: 0.01
+  p13_component_hard_negative_warmup_epochs: 10
+  p13_spatial_cell_size: 3
+  p13_temporal_bin_size: 50
+  p13_min_cell_events: 2
+  p13_activation_threshold: 0.45
+  p13_activation_temperature: 0.10
+  # P17: rank low-confidence positives above high-confidence backgrounds.
+  p17_positive_ranking_enabled: false
+  p17_positive_ranking_weight: 0.02
+  p17_positive_ranking_ratio: 0.01
+  p17_positive_ranking_margin: 0.05
+  p17_positive_ranking_warmup_epochs: 10
+  # P22: balance positive BCE across official target-time groups.
+  p22_target_frame_balanced_enabled: false
+  p22_target_frame_balanced_weight: 0.02
+  p22_target_frame_balanced_warmup_epochs: 0
+  p22_temporal_bin_size: 50
+
+TEST:
+  vis: False
+  eval: True
+  roc: True
+  pd_detT: 50
+  correct_thresh: 0.0001
+  save: True
+  model_path: /mnt/d/AI/ESOD/EV-UAV-main/log/baseline_scratch_seed37/best_iou_seed37.pt
+  prediction_threshold: 0.9
+
+POSTPROCESS:
+  # P0: disabled by default; enable with --set POSTPROCESS.p0_enabled=true
+  p0_enabled: false
+  p0_spatial_radius: 1
+  p0_temporal_bin_size: 50
+  p0_temporal_radius_bins: 1
+  p0_min_cluster_events: 2
+  p0_min_duration_bins: 1
+  # P0c: retain only very high-confidence clusters that P0 would remove.
+  p0c_high_confidence_recovery_enabled: false
+  p0c_retain_min_score: 0.98
+  # P0b: centroid-track alternative to P0; P0 and P0b are mutually exclusive.
+  p0b_enabled: false
+  p0b_spatial_radius: 1
+  p0b_temporal_bin_size: 50
+  p0b_max_link_distance: 5.0
+  p0b_max_gap_bins: 1
+  p0b_min_track_events: 3
+  p0b_min_track_frames: 1
+  # P18: restore one weak event only when a dense-video score track has a P0 seed.
+  p18_score_track_recovery_enabled: false
+  p18_event_count_cutoff: 100000
+  p18_candidate_floor: 0.80
+  p18_spatial_radius: 2
+  p18_temporal_bin_size: 50
+  p18_max_link_distance: 6.0
+  p18_max_gap_bins: 1
+  p18_min_track_bins: 2
+  # P18 expansion policy. "best" preserves the original one-event recovery.
+  p18_restore_mode: best
+  # 0 means no component cap when restore_mode=component.
+  p18_max_restore_events_per_component: 0
+  # P6: density-adaptive decision threshold; disabled by default.
+  p6_density_threshold_enabled: false
+  p6_event_count_cutoff: 100000
+  p6_low_density_threshold: 0.70
+  p6_high_density_threshold: 0.92
+
+FUSION:
+  # P3-Lite: disabled by default; enable with --set FUSION.p3_lite_enabled=true
+  p3_lite_enabled: false
+  p3_lite_temporal_bins: 4
+  p3_lite_width: 8
+
+FEATURES:
+  # P11: label-free same-pixel temporal activity feature; disabled by default.
+  p11_local_activity_enabled: false
+  p11_local_activity_radius: 50
+  # P12: complete-stream local 3D density feature; disabled by default.
+  p12_local_density_enabled: false
+  p12_spatial_cell_size: 3
+  p12_temporal_cell_size: 50
+  p12_neighborhood_radius: 1
+
+TEMPORAL_FRAME:
+  # Full-stream auxiliary 2D model. Existing sparse scripts ignore this section.
+  temporal_frame_enabled: false
+  temporal_frame_bin_size: 50
+  temporal_frame_context_bins: 5
+  temporal_frame_width: 16
+  temporal_frame_batch_size: 4
+  temporal_frame_train_views_per_video: 8
+  temporal_frame_positive_frame_probability: 0.75
+  temporal_frame_target_positive_loss_mass: 0.20
+  temporal_frame_max_positive_weight: 16.0
+  # P26: directly encourage one confident positive per target/time group.
+  temporal_frame_target_coverage_enabled: false
+  temporal_frame_target_coverage_weight: 0.01
+  temporal_frame_target_coverage_warmup_epochs: 5
+  temporal_frame_target_coverage_score_floor: 0.70
+  temporal_frame_target_coverage_correct_fraction: 0.0001
+  # P32: train a soft target-centre heatmap from target IDs and feed its
+  # learned support back into the event logits through a zero-init residual.
+  temporal_frame_target_center_enabled: false
+  temporal_frame_target_center_loss_weight: 0.05
+  temporal_frame_target_center_warmup_epochs: 0
+  temporal_frame_target_center_sigma: 2.5
+  temporal_frame_target_center_radius: 6
+  temporal_frame_target_center_positive_loss_mass: 0.20
+  temporal_frame_target_center_max_positive_weight: 512.0
+  temporal_frame_target_center_empty_loss_weight: 0.10
+  temporal_frame_target_center_lr_multiplier: 10.0
+  # Freeze P23 when training only the new P32 branch for a conservative probe.
+  temporal_frame_target_center_freeze_base_enabled: false
+  temporal_frame_log_count_clip: 4.0
+  temporal_frame_cache_all_videos: true
+  temporal_frame_cache_video_count: 16
+  temporal_frame_train_workers: 0
+  temporal_frame_inference_batch_size: 8
+  temporal_frame_eval_thresholds: [0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]
+  temporal_frame_model_path: ""
+  # Sparse/frame mixture weight used only when temporal_frame_enabled=true.
+  temporal_frame_sparse_weight: 0.50
+  # P24: local density contrast and training-only dense-video sampling.
+  temporal_frame_local_contrast_enabled: false
+  temporal_frame_local_contrast_kernel_size: 9
+  temporal_frame_local_contrast_lr_multiplier: 1.0
+  # P25: local motion-tolerant temporal persistence channels.
+  temporal_frame_motion_persistence_enabled: false
+  temporal_frame_motion_persistence_radius_per_bin: 4
+  temporal_frame_motion_persistence_lr_multiplier: 1.0
+  # P27/P30: zero-initialized auxiliary temporal context adapter. A matching
+  # bin size enables P30 long-context input at the original frame resolution.
+  temporal_frame_fine_detail_enabled: false
+  temporal_frame_fine_temporal_bin_size: 25
+  temporal_frame_fine_context_bins: 9
+  temporal_frame_fine_detail_lr_multiplier: 1.0
+  temporal_frame_init_model_path: ""
+  temporal_frame_dense_sampling_enabled: false
+  temporal_frame_dense_event_count_cutoff: 200000
+  temporal_frame_dense_view_multiplier: 2
+
+TEMPORAL_MEMORY:
+  # P29: full-video bidirectional ConvGRU memory over P23 bottleneck maps.
+  temporal_memory_enabled: false
+  temporal_memory_bin_size: 50
+  temporal_memory_context_bins: 5
+  temporal_memory_width: 16
+  temporal_memory_sequence_length: 16
+  temporal_memory_train_views_per_video: 2
+  temporal_memory_positive_frame_probability: 0.75
+  temporal_memory_target_positive_loss_mass: 0.20
+  temporal_memory_max_positive_weight: 16.0
+  temporal_memory_log_count_clip: 4.0
+  temporal_memory_cache_all_videos: true
+  temporal_memory_cache_video_count: 16
+  temporal_memory_train_workers: 0
+  temporal_memory_inference_batch_size: 8
+  temporal_memory_model_path: ""
+  temporal_memory_init_model_path: ""
+  temporal_memory_base_lr_multiplier: 0.1
+  temporal_memory_memory_lr_multiplier: 1.0

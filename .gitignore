@@ -1,0 +1,19 @@
+# Training/inference artifacts
+log/
+runs/
+*.pt
+*.pth
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Data (download separately, see README 数据准备)
+dataset/训练集、验证集/
+dataset/train/
+dataset/val/
+
+# Misc
+.DS_Store
+*.swp
