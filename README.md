@@ -14,6 +14,11 @@
 
 四项指标全面超过官方 baseline（Pd +0.0113, IoU +0.0122, Acc +0.0092, Fa -12%）。
 
+> **方法论详解**（M4 / DACC 的数学模型、前向流程、安全初始化机制、消融依据、复现要点
+> 核对表）见 **[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)**。以下「方法」节为摘要。
+> 在此基础上叠加 M5 轨迹外推 loss 的版本见 **`m4-dacc-m5` 分支**（Score 0.94965 /
+> 调优 P0 0.95444）。
+
 评分使用官方 Challenge 2 公式：
 
 ```text
@@ -27,11 +32,21 @@ Score = 0.4 * Pd + 0.3 * Score_Fa + 0.2 * IoU + 0.1 * Acc
   分箱，每中心箱取前后共 5 个箱构建 10 通道（5 箱 x 2 极性）计数帧。事件坐标处取 logit
   计算平衡 BCE。官方实现细节见 `docs/CHANGES.md` 与官方 EVC 仓库。
 - **M4 双向时序记忆**（`model/temporal_memory_net.py`）：在 P23 U-Net bottleneck
-  上叠加一对 ConvGRU，沿完整视频序列正向/反向传播低分辨率证据，零初始化残差保证
-  加载 P23 权重后初始预测不变。时序建模提升 Pd / 降低 Fa。
+  （96 通道，H/8×W/8）上叠加一对 ConvGRU，沿完整视频序列正向/反向传播低分辨率证据。
+  ConvGRU 更新规则为
+  $h_t = (1-z_t)\odot h_{t-1} + z_t \odot \tilde h_t$，
+  其中 $z_t$ 为 update gate、$r_t$ 为 reset gate（3×3 卷积 + sigmoid 得到），
+  $\tilde h_t = \tanh(W_c * [x_t; r_t \odot h_{t-1}])$。正反向隐状态拼接后经 1×1 卷积
+  投影为**零初始化残差**，与 bottleneck 相加再解码——零初始化保证加载 P23 权重后初始
+  预测逐位不变，时序证据随训练逐步累积（真正的目标跨箱位置连续 → 置信抬升 Pd↑；瞬时
+  单 bin 噪声无一致性 → 抑制 Fa↓）。推理时先缓存全部 bottleneck、一次跑完整双向 GRU
+  再逐箱解码，峰值显存约 4GB。
 - **DACC 密度自适应通道校准**（`model/temporal_frame_net.py` 内
-  `DensityAdaptiveChannelCalibrator`）：通道级 SE 式密度校准，Sigmoid(4)≈1.0 安全
-  初始化。抑制高密度噪声，降低 Fa。
+  `DensityAdaptiveChannelCalibrator`）：通道级 SE 式密度门控。把原始输入计数帧沿通道
+  求和得密度图，经小 conv + 全局池化得每个样本的全局密度标量 $g$，再由两层 MLP +
+  Sigmoid 输出逐通道权重 $w_c=\sigma(W_2\,\mathrm{ReLU}(W_1 g))$，与解码特征逐通道相乘。
+  两层 MLP 零初始化、末层偏置置 4.0 → 初始 $w_c=\sigma(4)\approx0.98\approx1$（恒等），
+  P23 权重可无损加载。通道级重加权不改空间结构，因此不破坏 IoU。
 
 **关键训练设置（本仓库最重要的复现参数）：**
 
@@ -45,7 +60,7 @@ TEMPORAL_MEMORY.temporal_memory_base_lr_multiplier=1.0
 
 ## 环境配置
 
-已验证环境：WSL/Ubuntu、Python 3.9、PyTorch 1.9.1 + CUDA 11.1、torchvision 0.10.1、
+已验证环境：WSL/Ubuntu、Python 3.8（3.9 亦可）、PyTorch 1.9.1 + CUDA 11.1、torchvision 0.10.1、
 `spconv-cu111`、NumPy 1.23.5。
 
 ```bash

@@ -113,6 +113,8 @@ TEST:
   save: True
   model_path: /mnt/d/金种子小目标检测比赛/tmp/EVC/log/model/best_iou_seed37.pt
   prediction_threshold: 0.9
+  # Output directory for submit_challenge2.py val_*.txt files.
+  challenge_output_dir: ""
 
 POSTPROCESS:
   # P0: disabled by default; enable with --set POSTPROCESS.p0_enabled=true
@@ -258,5 +260,5 @@ TEMPORAL_MEMORY:
   temporal_memory_model_path: ""
   temporal_memory_init_model_path: ""
   temporal_memory_sparse_weight: 0.50
-  temporal_memory_base_lr_multiplier: 0.1
+  temporal_memory_base_lr_multiplier: 1.0  # 本仓库改为 1.0（关键）：0.1 会饿死 base
   temporal_memory_memory_lr_multiplier: 1.0
