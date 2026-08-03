@@ -30,6 +30,40 @@ Score_Fa = exp(-10000 * Fa)
 Score = 0.4 * Pd + 0.3 * Score_Fa + 0.2 * IoU + 0.1 * Acc
 ```
 
+## 预训练权重（免训练复现报告分数）
+
+训练产物（`*.pt`）已提交到 `checkpoints/`，**无需再训练即可复现报告分数**。仍需先按
+下方「数据准备」下载数据集并设置 `$DATA_ROOT`。
+
+| 文件 | 说明 | 用途 |
+| --- | --- | --- |
+| `checkpoints/m4_dacc_m5_best_loss_seed42.pt` | M4+DACC+M5（50 epoch，best epoch 48，seed 42） | 直接评估 → **Score 0.95444** |
+| `checkpoints/p23_baseline_5ep_seed42.pt` | P23 基线（5 epoch，best epoch 4，seed 42） | 重训 M4 时的 init 权重 |
+
+> 本仓库报告分数全部基于上述 `m4_dacc_m5_best_loss_seed42.pt`。若要逐位复现训练
+> 产物，用 `p23_baseline_5ep_seed42.pt` 作为 M4 的 `temporal_memory_init_model_path`
+> 并按「复现流程」第 2 步训练即可。
+
+### 免训练直接评估（复现 0.95444）
+
+```bash
+python test2.py --config configs/evisseg_evuav.yaml --set \
+  DATA.root="$DATA_ROOT" \
+  TEST.eval=true TEST.roc=true TEST.prediction_threshold=0.7 \
+  TEMPORAL_MEMORY.temporal_memory_enabled=true \
+  TEMPORAL_MEMORY.temporal_memory_model_path=checkpoints/m4_dacc_m5_best_loss_seed42.pt \
+  TEMPORAL_MEMORY.temporal_memory_sparse_weight=0.0 \
+  POSTPROCESS.p0_enabled=true POSTPROCESS.p0_spatial_radius=2 POSTPROCESS.p0_temporal_bin_size=50 \
+  POSTPROCESS.p0_temporal_radius_bins=1 POSTPROCESS.p0_min_cluster_events=3 POSTPROCESS.p0_min_duration_bins=5 \
+  POSTPROCESS.p0c_high_confidence_recovery_enabled=true POSTPROCESS.p0c_retain_min_score=0.92
+```
+
+预期输出 `Score: 0.9544424489`（调优 P0：mdb=5 / retain=0.92）。若改用官方 P0 参数
+（mdb=1）评估则为 **0.94965**，与「结果总览」一致。
+
+> 注：`checkpoints/.gitignore` 用 `!*.pt` 放行了该目录以便提交权重；仓库其余位置
+> 仍忽略 `*.pt`。
+
 ## 方法
 
 - **P23 基线**：轻量级 2D U-Net（width=16，输入 346x260），把完整事件流按 50 时间单位
